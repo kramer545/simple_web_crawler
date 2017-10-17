@@ -14,24 +14,20 @@ var cheerio = require('cheerio');
 var numNextPages = 0;
 var visitedPages = new Set(); //pages we parsed already, don't repeat, set doesnt allow duplicates
 var nextPages = []; //stack of unvisited pages to parse, order doesnt matter
-var firstURL;
-
-//var jsonObject = new Object(); //object, where each index is a url, which each has a array of assets
+var baseURL;
 
 //Handles cmd line input for url
 if(typeof process.argv[2] == "undefined") //if no url given, use sample url
 {
 	console.log("url input undefined, using https://accelerateokanagan.com");
-	firstURL = "https://accelerateokanagan.com";
+	baseURL = "https://accelerateokanagan.com";
 }
 else //url given, use that
 {
-	firstURL = process.argv[2]
+	baseURL = process.argv[2]
 }
 
-nextPages.push(firstURL);
-var url = new URL(firstURL);
-var baseURL = url.protocol + "//" + url.hostname;
+nextPages.push(baseURL);
 numNextPages = 1;
 crawl();
 
