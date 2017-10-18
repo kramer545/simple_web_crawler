@@ -4,9 +4,10 @@ Ryan Kramer
 This program is a simple web crawler using Node.js to traverse all links from the given url within its domain 
 until no pages are left and afterwords to output the urls of each static asset from each page
 
-Uses three libraries, url-parse to parse the url
+Uses three libraries, url-parse to parse the url to get the protocol and hostname, request to load a webpage, and cheerio is a html parser for finding elements
 */
 
+//Initilize program parameters
 var URL = require('url-parse');
 var request = require('request');
 var cheerio = require('cheerio');
@@ -27,13 +28,15 @@ else //url given, use that
 	baseURL = process.argv[2]
 }
 
-nextPages.push(baseURL);
-var URL = new URL(baseURL);
-baseURL = URL.protocol + "//" + URL.hostname;
+nextPages.push(baseURL); //add first page to pages to visit
 numNextPages = 1;
-crawl();
 
-function crawl()
+var URL = new URL(baseURL);
+baseURL = URL.protocol + "//" + URL.hostname; //used for getting full url of local assets/links
+
+crawl(); //starts crawl / program
+
+function crawl() //checks if all pages are visited, otherwise loads the next one via visitPage(), called each time a page is done
 {
 	if(numNextPages == 0)
 	{
@@ -49,7 +52,6 @@ function crawl()
 			return;
 		}
 		numNextPages--;
-		//console.log(nextPage +" "+numNextPages);
 		if(nextPage in visitedPages)
 		{
 			crawl();
@@ -62,17 +64,16 @@ function crawl()
 }
 function visitPage(url) //visit a single page, and get its sublinks and asset urls
 {
-	//console.log("Visiting page " + url); //debug purposes
 	request(url, function(error, response, body) {
-	   if(error) {
+	   if(error) { //something went wrong, just return
 		 console.log("Error: " + error);
+		 crawl();
+		 return;
 	   }
-	   // Check status code (200 is HTTP OK)
-	   //console.log("Status code: " + response.statusCode); //debug purposes
+	   // status code 200 means good
 	   if(response.statusCode === 200) {
 		 // Parse the document body
 		 var body = cheerio.load(body);
-		 //console.log("Page title:  " + $('title').text());
 		 var jsonObject = new Object();
 		 
 		 //finding links
@@ -80,16 +81,17 @@ function visitPage(url) //visit a single page, and get its sublinks and asset ur
 		 visitedPages[url] = true;
 		 var assets = [];
 		 getLinks(body);
-		 //assets
+		 
+		 //getting assets
 		 getImgs(body,assets);
 		 getScripts(body,assets);
 		 getStyle(body,assets);
 		 jsonObject.assets = assets;
 		 
-		 console.log(JSON.stringify(jsonObject,null,4) +"\n"); //prints json object using 4 spaces for indentation
-		 crawl();
+		 console.log(JSON.stringify(jsonObject,null,4) +"\n"); //prints json object using 4 spaces for indentation, done inside request so runs after all assets added
+		 crawl(); //call for next page check, crawl() will stop itself if nothing new is left
 	   }
-	   else
+	   else //bad status code, not error
 	   {
 		   crawl();
 		   return;
@@ -100,13 +102,15 @@ function visitPage(url) //visit a single page, and get its sublinks and asset ur
 function getLinks(body) //get sublinks for traversing
 {
 	var relativeLinks = body("a[href^='/']");
-	//console.log("Found " + relativeLinks.length + " relative links on page");
 	relativeLinks.each(function() {
-		//if(baseURL + body(this).attr('href') !== baseURL + "/")
-		if((body(this).attr('href').charAt(0) === "/") || (body(this).attr('href').startsWith(baseURL))) //check if link starts with '/' (relative link) or is absolute link of same domain
+		if(body(this).attr('href').charAt(0) === "/") //check if link starts with '/' (relative link)
 		{
-			//console.log(baseUrl + body(this).attr('href'));
 			nextPages.push(baseURL + body(this).attr('href'));
+			numNextPages++;
+		}
+		else if(body(this).attr('href').startsWith(baseURL)) //For absolute links within domain, doesn't add baseURL as is already includes it
+		{
+			nextPages.push(body(this).attr('href'));
 			numNextPages++;
 		}
 	});
@@ -127,7 +131,7 @@ function getImgs(body, assets) //get urls of images on curr page
 
 function getScripts(body,assets) // get non-dynamic script urls for curr page
 {
-	var currSet = new Set(); //prevents duplicate scripts (unlikely to happen)
+	var currSet = new Set(); //prevents duplicate scripts (unlikely to happen, but you never know)
 	assetLinks = body("script");
 	assetLinks.each(function() {
 		if((!currSet.has(baseURL + body(this).attr("src"))) && (body(this).attr("src"))) //this prevents adding dynamic script urls, which end up broken

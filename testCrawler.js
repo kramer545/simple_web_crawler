@@ -8,22 +8,16 @@ var URL = require('url-parse');
 var request = require('request');
 var cheerio = require('cheerio');
 
-var numNextPages = 0;
-var visitedPages = new Set(); //pages we parsed already, don't repeat, set doesnt allow duplicates
-var nextPages = []; //stack of unvisited pages to parse, order doesnt matter
-var baseURL;
-
 console.log("Using http://webscraper.io/test-sites/e-commerce/allinone");
-baseURL = "http://webscraper.io/test-sites/e-commerce/allinone";
+var baseURL = "http://webscraper.io/test-sites/e-commerce/allinone";
 
-nextPages.push(baseURL);
 var firstURL = baseURL;
 var URL = new URL(baseURL);
 baseURL = URL.protocol + "//" + URL.hostname;
-numNextPages = 1;
+
 runTests();
 
-function runTests()
+function runTests() //runs all tests
 {
 	console.log("\n");
 	setCompareTest();
@@ -34,7 +28,7 @@ function runTests()
 	imgTest();
 }
 
-function setCompareTest()
+function setCompareTest() //due to Set comparisions being used to remove/check duplicate links/assets, functionallity is tested here
 {
 	var passed = true;
 	var testSet = new Set();
@@ -54,6 +48,7 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 	var numCorr = 0;
 	var linkSet = new Set();
 	var currSet = new Set(); //prevents duplictate links for score, not needed as in program links are added to set, so no need to check
+	//Looked up links manually
 	linkSet.add("http://webscraper.io/");
 	linkSet.add("http://webscraper.io/screenshots");
 	linkSet.add("http://webscraper.io/tutorials");
@@ -62,7 +57,7 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 	linkSet.add("http://webscraper.io/help");
 	linkSet.add("http://webscraper.io/service");
 	linkSet.add("http://webscraper.io/data-specialist");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone"); //next few are weird as they are local, but since program goes off local href diffrences, likely reroute stuff
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone");
 	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/computers");
 	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/phones");
 	linkSet.add("http://webscraper.io/contact");
@@ -70,25 +65,33 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 	   if(error) {
 		 console.log("Error: " + error);
 	   }
-	   // Check status code (200 is HTTP OK)
-	   //console.log("Status code: " + response.statusCode); //debug purposes
 	   if(response.statusCode === 200) {
 		 // Parse the document body
 		 var body = cheerio.load(body);
-		 //console.log("Page title:  " + $('title').text());
-		 var relativeLinks = body("a"); //looks for links that start with '/' as they are relative links that won't redirect outside domain
-		 //console.log("Found " + relativeLinks.length + " relative links on page");
+		 var relativeLinks = body("a");
 		 relativeLinks.each(function() {
-			//if(baseURL + body(this).attr('href') !== baseURL + "/")
-			if((body(this).attr('href').charAt(0) === "/") || (body(this).attr('href').startsWith(baseURL))) //check if link starts with '/' (relative link) or is absolute link of same domain
-			//if(true)
+			if(body(this).attr('href').charAt(0) === "/") //check if link starts with '/' (relative link)
 			{
 				var str = baseURL + body(this).attr('href');
 				if(!currSet.has(str))
 				{
 					currSet.add(str);
-					//console.log(baseURL + body(this).attr('href'));
+					//console.log(baseURL + body(this).attr('href')); //debug msg for testing on fail
 					if(linkSet.has(str))
+					{
+						//console.log(str);
+						numCorr++;
+					}
+				}
+			}
+			else if (body(this).attr('href').startsWith(baseURL))) // absolute link on same domain, don't add baseURL as its already included
+			{
+				var str = body(this).attr('href');
+				if(!currSet.has(str)) //prevents duplicate links (here only for this page, real program has global link set
+				{
+					currSet.add(str);
+					//console.log(body(this).attr('href')); //debug msg for testing on fail
+					if(linkSet.has(str)) //check if link is one of the ones I know exists on test page
 					{
 						//console.log(str);
 						numCorr++;
@@ -102,18 +105,18 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 		   console.log("status code not 200");
 	   }
 	   //console.log(numCorr +" "+ linkSet.size);
-	   if(numCorr == linkSet.size)
+	   if(numCorr == linkSet.size) //if number of links match, then we have all the links without duplicates
 		   console.log("firstLevelLinksTest Passed");
 	   else
 		   console.log("firstLevelLinksTest Failed");
 	});
 }
 
-function addsNewPages()
+function addsNewPages() //tests if new page links are added/stored correctly
 {
 	var numCorr = 0;
 	var linkSet = new Set();
-	var currSet = new Set(); //prevents duplictate links for score, not needed as in program links are added to set, so no need to check
+	var currSet = new Set();
 	var nextPages = [];
 	linkSet.add("http://webscraper.io/");
 	linkSet.add("http://webscraper.io/screenshots");
@@ -123,7 +126,7 @@ function addsNewPages()
 	linkSet.add("http://webscraper.io/help");
 	linkSet.add("http://webscraper.io/service");
 	linkSet.add("http://webscraper.io/data-specialist");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone"); //next few are weird as they are local, but since program goes off local href diffrences, likely reroute stuff
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone");
 	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/computers");
 	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/phones");
 	linkSet.add("http://webscraper.io/contact");
@@ -132,24 +135,18 @@ function addsNewPages()
 		 console.log("Error: " + error);
 	   }
 	   // Check status code (200 is HTTP OK)
-	   //console.log("Status code: " + response.statusCode); //debug purposes
 	   if(response.statusCode === 200) {
 		 // Parse the document body
 		 var body = cheerio.load(body);
-		 //console.log("Page title:  " + $('title').text());
-		 var relativeLinks = body("a"); //looks for links that start with '/' as they are relative links that won't redirect outside domain
-		 //console.log("Found " + relativeLinks.length + " relative links on page");
+		 var relativeLinks = body("a"); //looks for links, check if correct later to check both relative and absolute urls
 		 relativeLinks.each(function() {
-			//if(baseURL + body(this).attr('href') !== baseURL + "/")
 			if((body(this).attr('href').charAt(0) === "/") || (body(this).attr('href').startsWith(baseURL))) //check if link starts with '/' (relative link) or is absolute link of same domain
-			//if(true)
 			{
 				var str = baseURL + body(this).attr('href');
 				if(!currSet.has(str))
 				{
 					currSet.add(str);
 					nextPages.push(str);
-					//console.log(baseURL + body(this).attr('href'));numCorr++;
 				}
 			}
 		 });
@@ -159,7 +156,7 @@ function addsNewPages()
 		   console.log("status code not 200");
 	   }
 	   //console.log(numCorr +" "+ linkSet.size);
-	   if(currSet.size == linkSet.size)
+	   if(currSet.size == linkSet.size) //we know we added pages to set, now check if we can traverse one of them
 	   {
 		   console.log("addsNewPages Passed");
 		   traversesNextPages(nextPages);
@@ -169,7 +166,7 @@ function addsNewPages()
 	});
 }
 
-function traversesNextPages(nextPages)
+function traversesNextPages(nextPages) //checks if new pages added can be traversed / exist
 {
 	var numCorr = 0;
 	var newURL = nextPages.pop();
@@ -197,7 +194,7 @@ function traversesNextPages(nextPages)
 	});
 }
 
-function cssTest()
+function cssTest() //checking if all css assets grabbed
 {
 	var numCorr = 0;
 	var passed = false;
@@ -233,7 +230,7 @@ function cssTest()
 	});
 }
 
-function scriptTest()
+function scriptTest() // checking if all static scripts grabbed
 {
 	var numCorr = 0;
 	var passed = false;
@@ -268,7 +265,7 @@ function scriptTest()
 	});
 }
 
-function imgTest()
+function imgTest() //checking if all imgs grabbed
 {
 	var numCorr = 0;
 	var passed = false;
