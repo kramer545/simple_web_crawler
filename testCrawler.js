@@ -17,6 +17,9 @@ console.log("Using http://webscraper.io/test-sites/e-commerce/allinone");
 baseURL = "http://webscraper.io/test-sites/e-commerce/allinone";
 
 nextPages.push(baseURL);
+var firstURL = baseURL;
+var URL = new URL(baseURL);
+baseURL = URL.protocol + "//" + URL.hostname;
 numNextPages = 1;
 runTests();
 
@@ -25,6 +28,10 @@ function runTests()
 	console.log("\n");
 	setCompareTest();
 	firstLevelLinksTest();
+	addsNewPages(); //also includes traverseNextPages() if passed
+	cssTest();
+	scriptTest();
+	imgTest();
 }
 
 function setCompareTest()
@@ -46,18 +53,20 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 {
 	var numCorr = 0;
 	var linkSet = new Set();
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/screenshots");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/tutorials");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/documentation");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/test-sites");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/help");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/service");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/data-specialist");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/test-sites/e-commerce/allinone"); //next few are weird as they are local, but since program goes off local href diffrences, likely reroute stuff
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/test-sites/e-commerce/allinone/computers");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/test-sites/e-commerce/allinone/phones");
-	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/contact");
-	request(baseURL, function(error, response, body) {
+	var currSet = new Set(); //prevents duplictate links for score, not needed as in program links are added to set, so no need to check
+	linkSet.add("http://webscraper.io/");
+	linkSet.add("http://webscraper.io/screenshots");
+	linkSet.add("http://webscraper.io/tutorials");
+	linkSet.add("http://webscraper.io/documentation");
+	linkSet.add("http://webscraper.io/test-sites");
+	linkSet.add("http://webscraper.io/help");
+	linkSet.add("http://webscraper.io/service");
+	linkSet.add("http://webscraper.io/data-specialist");
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone"); //next few are weird as they are local, but since program goes off local href diffrences, likely reroute stuff
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/computers");
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/phones");
+	linkSet.add("http://webscraper.io/contact");
+	request(firstURL, function(error, response, body) {
 	   if(error) {
 		 console.log("Error: " + error);
 	   }
@@ -67,16 +76,23 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 		 // Parse the document body
 		 var body = cheerio.load(body);
 		 //console.log("Page title:  " + $('title').text());
-		 var relativeLinks = body("a[href^='/']");
+		 var relativeLinks = body("a"); //looks for links that start with '/' as they are relative links that won't redirect outside domain
 		 //console.log("Found " + relativeLinks.length + " relative links on page");
 		 relativeLinks.each(function() {
-			if(baseURL + body(this).attr('href') !== baseURL + "/")
+			//if(baseURL + body(this).attr('href') !== baseURL + "/")
+			if((body(this).attr('href').charAt(0) === "/") || (body(this).attr('href').startsWith(baseURL))) //check if link starts with '/' (relative link) or is absolute link of same domain
+			//if(true)
 			{
-				//console.log(baseURL + body(this).attr('href'));
 				var str = baseURL + body(this).attr('href');
-				if(linkSet.has(str))
+				if(!currSet.has(str))
 				{
-					numCorr++;
+					currSet.add(str);
+					//console.log(baseURL + body(this).attr('href'));
+					if(linkSet.has(str))
+					{
+						//console.log(str);
+						numCorr++;
+					}
 				}
 			}
 		 });
@@ -85,6 +101,7 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 	   {
 		   console.log("status code not 200");
 	   }
+	   //console.log(numCorr +" "+ linkSet.size);
 	   if(numCorr == linkSet.size)
 		   console.log("firstLevelLinksTest Passed");
 	   else
@@ -92,37 +109,25 @@ function firstLevelLinksTest() //tests if all links on base site are hit
 	});
 }
 
-function crawl()
+function addsNewPages()
 {
-	if(numNextPages == 0)
-	{
-		console.log("No more pages");
-		return;
-	}
-	else
-	{
-		var nextPage = nextPages.pop();
-		if(typeof nextPage == "undefined")
-		{
-			console.log("No more pages");
-			return;
-		}
-		numNextPages--;
-		//console.log(nextPage +" "+numNextPages);
-		if(nextPage in visitedPages)
-		{
-			crawl();
-		}
-		else
-		{
-			visitPage(nextPage);
-		}
-	}
-}
-function visitPage(url) //visit a single page, and get its sublinks and asset urls
-{
-	//console.log("Visiting page " + url); //debug purposes
-	request(url, function(error, response, body) {
+	var numCorr = 0;
+	var linkSet = new Set();
+	var currSet = new Set(); //prevents duplictate links for score, not needed as in program links are added to set, so no need to check
+	var nextPages = [];
+	linkSet.add("http://webscraper.io/");
+	linkSet.add("http://webscraper.io/screenshots");
+	linkSet.add("http://webscraper.io/tutorials");
+	linkSet.add("http://webscraper.io/documentation");
+	linkSet.add("http://webscraper.io/test-sites");
+	linkSet.add("http://webscraper.io/help");
+	linkSet.add("http://webscraper.io/service");
+	linkSet.add("http://webscraper.io/data-specialist");
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone"); //next few are weird as they are local, but since program goes off local href diffrences, likely reroute stuff
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/computers");
+	linkSet.add("http://webscraper.io/test-sites/e-commerce/allinone/phones");
+	linkSet.add("http://webscraper.io/contact");
+	request(firstURL, function(error, response, body) {
 	   if(error) {
 		 console.log("Error: " + error);
 	   }
@@ -132,68 +137,171 @@ function visitPage(url) //visit a single page, and get its sublinks and asset ur
 		 // Parse the document body
 		 var body = cheerio.load(body);
 		 //console.log("Page title:  " + $('title').text());
-		 var jsonObject = new Object();
-		 
-		 //finding links
-		 jsonObject.url = url;
-		 visitedPages[url] = true;
-		 var assets = [];
-		 getLinks(body);
-		 //assets
-		 getImgs(body,assets);
-		 getScripts(body,assets);
-		 getStyle(body,assets);
-		 jsonObject.assets = assets;
-		 
-		 console.log(JSON.stringify(jsonObject,null,4) +"\n"); //prints json object using 4 spaces for indentation
-		 crawl();
+		 var relativeLinks = body("a"); //looks for links that start with '/' as they are relative links that won't redirect outside domain
+		 //console.log("Found " + relativeLinks.length + " relative links on page");
+		 relativeLinks.each(function() {
+			//if(baseURL + body(this).attr('href') !== baseURL + "/")
+			if((body(this).attr('href').charAt(0) === "/") || (body(this).attr('href').startsWith(baseURL))) //check if link starts with '/' (relative link) or is absolute link of same domain
+			//if(true)
+			{
+				var str = baseURL + body(this).attr('href');
+				if(!currSet.has(str))
+				{
+					currSet.add(str);
+					nextPages.push(str);
+					//console.log(baseURL + body(this).attr('href'));numCorr++;
+				}
+			}
+		 });
 	   }
 	   else
 	   {
-		   crawl();
-		   return;
+		   console.log("status code not 200");
+	   }
+	   //console.log(numCorr +" "+ linkSet.size);
+	   if(currSet.size == linkSet.size)
+	   {
+		   console.log("addsNewPages Passed");
+		   traversesNextPages(nextPages);
+	   }
+	   else
+		   console.log("addsNewPages Failed");
+	});
+}
+
+function traversesNextPages(nextPages)
+{
+	var numCorr = 0;
+	var newURL = nextPages.pop();
+	
+	//after first run where pages are retrived and stored in currSet
+	request(newURL, function(error, response, body) {
+	   if(error) {
+		 console.log("Error: " + error);
+	   }
+	   // Check status code (200 is HTTP OK)
+	   //console.log("Status code: " + response.statusCode); //debug purposes
+	   if(response.statusCode === 200) {
+		 // Parse the document body
+		 var body = cheerio.load(body);
+		 //console.log("Page title:  " + $('title').text());
+		 if((newURL != firstURL) && (typeof body != "undefined")) //check if new url and page exists
+			 console.log("traverseNextPages Passed at URL: " + newURL);
+		 else
+			 console.log("traverseNextPages Failed");
+	   }
+	   else
+	   {
+		   console.log("status code not 200");
 	   }
 	});
 }
 
-function getLinks(body) //get sublinks for traversing
+function cssTest()
 {
-	var relativeLinks = body("a[href^='/']");
-	//console.log("Found " + relativeLinks.length + " relative links on page");
-	relativeLinks.each(function() {
-		if(baseURL + body(this).attr('href') !== baseURL + "/")
-		{
-			console.log(baseURL + body(this).attr('href'));
-			//nextPages.push(baseURL + body(this).attr('href'));
-			numNextPages++;
-		}
+	var numCorr = 0;
+	var passed = false;
+	var cssValue = "http://webscraper.io/css/app.css"; //only one css file
+	request(firstURL, function(error, response, body) {
+	   if(error) {
+		 console.log("Error: " + error);
+	   }
+	   // Check status code (200 is HTTP OK)
+	   //console.log("Status code: " + response.statusCode); //debug purposes
+	   if(response.statusCode === 200) {
+		 // Parse the document body
+		 var body = cheerio.load(body);
+		 //console.log("Page title:  " + $('title').text());
+		 assetLinks = body('link');
+		 assetLinks.each(function() {
+			 if(((body(this).attr("rel") == "stylesheet")))
+			 {
+				if((baseURL + body(this).attr("href")) === cssValue)
+					passed = true;
+			 }
+		 });
+	   }
+	   else
+	   {
+		   console.log("status code not 200");
+	   }
+	   //console.log(numCorr +" "+ linkSet.size);
+	   if(passed)
+		   console.log("cssTest Passed");
+	   else
+		   console.log("cssTest Failed");
 	});
 }
 
-function getImgs(body, assets) //get urls of images on curr page
+function scriptTest()
 {
-	var assetLinks = body('img');
-	assetLinks.each(function() {
-		assets.push(baseURL + body(this).attr("src"));
-		numNextPages++;
+	var numCorr = 0;
+	var passed = false;
+	var scriptValue = "http://webscraper.io/js/app.js"; //only one static script
+	request(firstURL, function(error, response, body) {
+	   if(error) {
+		 console.log("Error: " + error);
+	   }
+	   // Check status code (200 is HTTP OK)
+	   //console.log("Status code: " + response.statusCode); //debug purposes
+	   if(response.statusCode === 200) {
+		 // Parse the document body
+		 var body = cheerio.load(body);
+		 //console.log("Page title:  " + $('title').text());
+		assetLinks = body("script");
+		assetLinks.each(function() {
+			if((body(this).attr("src")))
+			 {
+				if((baseURL + body(this).attr("src")) === scriptValue)
+					passed = true;
+			 }
+		 });
+	   }
+	   else
+	   {
+		   console.log("status code not 200");
+	   }
+	   if(passed)
+		   console.log("scriptTest Passed");
+	   else
+		   console.log("scriptTest Failed");
 	});
 }
 
-function getScripts(body,assets) // get non-dynamic script urls for curr page
+function imgTest()
 {
-	assetLinks = body("script");
-	assetLinks.each(function() {
-		if(body(this).attr("src")) //this prevents adding dynamic script urls, which end up broken
-			assets.push(baseURL + body(this).attr("src"));
+	var numCorr = 0;
+	var passed = false;
+	var currSet = new Set(); //prevents duplicate imgs, check if size is one
+	var imgValue = "http://webscraper.io/images/test-sites/e-commerce/items/cart2.png"; //only one img, but there are multiple of it on page
+	request(firstURL, function(error, response, body) {
+	   if(error) {
+		 console.log("Error: " + error);
+	   }
+	   // Check status code (200 is HTTP OK)
+	   //console.log("Status code: " + response.statusCode); //debug purposes
+	   if(response.statusCode === 200) {
+		 // Parse the document body
+		 var body = cheerio.load(body);
+		 //console.log("Page title:  " + $('title').text());
+		var assetLinks = body('img');
+		assetLinks.each(function() {
+			if(!currSet.has(baseURL + body(this).attr("src")))
+			 {
+				currSet.add(baseURL + body(this).attr("src"));
+				if((baseURL + body(this).attr("src")) === imgValue)
+					passed = true;
+			 }
+		 });
+	   }
+	   else
+	   {
+		   console.log("status code not 200");
+	   }
+	   if((passed) && (currSet.size == 1))
+		   console.log("imgTest Passed");
+	   else
+		   console.log("imgTest Failed");
 	});
 }
 
-function getStyle(body,assets) // get stylesheets from curr page
-{
-	//Stylesheets are done via links, but need to check .rel if it is actually a stylesheet
-	assetLinks = body('link');
-	assetLinks.each(function() {
-		if(body(this).attr("rel") == "stylesheet")
-			assets.push(baseURL + body(this).attr("href"));
-	});
-}

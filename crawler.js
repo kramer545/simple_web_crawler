@@ -28,6 +28,8 @@ else //url given, use that
 }
 
 nextPages.push(baseURL);
+var URL = new URL(baseURL);
+baseURL = URL.protocol + "//" + URL.hostname;
 numNextPages = 1;
 crawl();
 
@@ -43,7 +45,7 @@ function crawl()
 		var nextPage = nextPages.pop();
 		if(typeof nextPage == "undefined")
 		{
-			console.log("No more pages");
+			console.log("Trying to load undefined page, cancelling");
 			return;
 		}
 		numNextPages--;
@@ -100,7 +102,8 @@ function getLinks(body) //get sublinks for traversing
 	var relativeLinks = body("a[href^='/']");
 	//console.log("Found " + relativeLinks.length + " relative links on page");
 	relativeLinks.each(function() {
-		if(baseURL + body(this).attr('href') !== baseURL + "/")
+		//if(baseURL + body(this).attr('href') !== baseURL + "/")
+		if((body(this).attr('href').charAt(0) === "/") || (body(this).attr('href').startsWith(baseURL))) //check if link starts with '/' (relative link) or is absolute link of same domain
 		{
 			//console.log(baseUrl + body(this).attr('href'));
 			nextPages.push(baseURL + body(this).attr('href'));
@@ -111,28 +114,40 @@ function getLinks(body) //get sublinks for traversing
 
 function getImgs(body, assets) //get urls of images on curr page
 {
+	var currSet = new Set(); //prevents duplicate imgs
 	var assetLinks = body('img');
 	assetLinks.each(function() {
-		assets.push(baseURL + body(this).attr("src"));
-		numNextPages++;
+		if(!currSet.has(baseURL + body(this).attr("src")))
+		{
+			currSet.add(baseURL + body(this).attr("src"));
+			assets.push(baseURL + body(this).attr("src"));
+		}
 	});
 }
 
 function getScripts(body,assets) // get non-dynamic script urls for curr page
 {
+	var currSet = new Set(); //prevents duplicate scripts (unlikely to happen)
 	assetLinks = body("script");
 	assetLinks.each(function() {
-		if(body(this).attr("src")) //this prevents adding dynamic script urls, which end up broken
+		if((!currSet.has(baseURL + body(this).attr("src"))) && (body(this).attr("src"))) //this prevents adding dynamic script urls, which end up broken
+		{
+			currSet.add(baseURL + body(this).attr("src"));
 			assets.push(baseURL + body(this).attr("src"));
+		}
 	});
 }
 
 function getStyle(body,assets) // get stylesheets from curr page
 {
+	var currSet = new Set(); //prevents duplicate stylesheets
 	//Stylesheets are done via links, but need to check .rel if it is actually a stylesheet
 	assetLinks = body('link');
 	assetLinks.each(function() {
-		if(body(this).attr("rel") == "stylesheet")
+		if((!currSet.has(baseURL + body(this).attr("href"))) && ((body(this).attr("rel") == "stylesheet")))
+		{
+			currSet.add(baseURL + body(this).attr("href"));
 			assets.push(baseURL + body(this).attr("href"));
+		}
 	});
 }
